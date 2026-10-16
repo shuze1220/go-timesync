@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>time_sync · 校时控制面板</title>
+<style>
+:root{
+  --bg:#0b1120; --panel:#141c2c; --panel2:#0f1626; --line:#253148;
+  --text:#e6edf7; --muted:#8b9ab4; --accent:#38bdf8;
+  --green:#22c55e; --yellow:#f59e0b; --red:#ef4444; --blue:#3b82f6;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.18);
+}
+html[data-theme="light"]{
+  --bg:#f2f5fa; --panel:#ffffff; --panel2:#f7f9fd; --line:#e3e9f2;
+  --text:#16202f; --muted:#64748b; --accent:#0284c7;
+  --green:#16a34a; --yellow:#b45309; --red:#dc2626; --blue:#2563eb;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;
+  transition:background .2s,color .2s}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Cascadia Mono",monospace}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:12px 20px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--panel) 88%,transparent);
+  backdrop-filter:blur(8px)}
+header h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.2px}
+.pill{padding:2px 9px;border-radius:999px;font-size:12px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.pill.ok{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,var(--line))}
+.pill.warn{color:var(--yellow);border-color:color-mix(in srgb,var(--yellow) 40%,var(--line))}
+.pill.bad{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.spacer{flex:1}
+
+button{cursor:pointer;padding:6px 13px;background:var(--blue);color:#fff;border:0;border-radius:7px;
+  font-size:13px;font-family:inherit;transition:filter .15s,opacity .15s}
+button:hover{filter:brightness(1.12)} button:disabled{opacity:.5;cursor:not-allowed}
+button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+button.danger{background:var(--red)}
+button.ghost{background:transparent;color:var(--muted);border:1px solid transparent;padding:4px 8px}
+button.ghost:hover{background:var(--panel2);color:var(--text)}
+button.sm{padding:3px 9px;font-size:12px;border-radius:6px}
+input,select{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:6px 9px;
+  border-radius:6px;font-size:13px;font-family:inherit;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+
+main{padding:16px 20px 40px;max-width:1280px;margin:0 auto}
+
+/* ---------- hero ---------- */
+.hero{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:14px}
+.hcard{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:16px 18px;box-shadow:var(--shadow)}
+.hcard::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent);opacity:.85}
+.hcard.good::before{background:var(--green)} .hcard.mid::before{background:var(--yellow)} .hcard.bad::before{background:var(--red)}
+.hcard .cap{font-size:12px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+.hcard .val{font-size:34px;font-weight:680;letter-spacing:-.5px;margin:4px 0 2px;
+  font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.15}
+.hcard .sub{font-size:12px;color:var(--muted)}
+.hcard .val.good{color:var(--green)} .hcard .val.mid{color:var(--yellow)} .hcard .val.bad{color:var(--red)}
+.hcard .val .unit{font-size:15px;font-weight:500;color:var(--muted);margin-left:3px}
+
+/* ---------- cards ---------- */
+.grid2{display:grid;gap:14px;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);margin-bottom:14px}
+.grid2.even{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+@media(max-width:1000px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.card > h2{margin:0 0 12px;font-size:13px;font-weight:650;color:var(--muted);letter-spacing:.6px;
+  text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.card > h2 .spacer{flex:1}
+.card.folded .body{display:none}
+.card > h2 .fold{cursor:pointer;user-select:none;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0}
+
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .label{color:var(--muted);font-size:13px;white-space:nowrap}
+.row .value{text-align:right;font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.good{color:var(--green)} .mid{color:var(--yellow)} .bad{color:var(--red)} .muted{color:var(--muted)}
+
+/* ---------- chart ---------- */
+.chart-wrap{width:100%;overflow:hidden}
+.chart-wrap svg{width:100%;height:auto;display:block}
+.gl{stroke:var(--line);stroke-width:1}
+.gl.zero{stroke:var(--muted);stroke-width:1;opacity:.7}
+.ax{fill:var(--muted);font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.band{fill:var(--accent);opacity:.07}
+.thr{stroke:var(--yellow);stroke-width:1;stroke-dasharray:4 4;opacity:.55}
+.series{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.area{fill:var(--accent);opacity:.10}
+.dot{fill:var(--accent)}
+.dot:hover{fill:var(--yellow)}
+.empty{padding:34px 10px;text-align:center;color:var(--muted);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border-radius:0;background:transparent;color:var(--muted);border:0;padding:3px 10px;font-size:12px}
+.seg button.on{background:var(--accent);color:#fff}
+
+/* ---------- sources ---------- */
+.src{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.src:last-child{border-bottom:0}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--muted)}
+.src.ok .dot{background:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 22%,transparent)}
+.src.fail .dot{background:var(--red);box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 20%,transparent)}
+.src .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,Consolas,monospace}
+.src.fail .name{color:var(--red)}
+.kind{font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);flex:none;letter-spacing:.5px}
+.src .off{width:74px;text-align:right;font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;flex:none}
+.bar{width:54px;height:5px;border-radius:3px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;flex:none}
+.bar i{display:block;height:100%;background:var(--accent)}
+.src.fail .bar i{background:var(--red)}
+.src .dly{width:56px;text-align:right;color:var(--muted);font-family:ui-monospace,Menlo,Consolas,monospace;flex:none;font-size:12px}
+
+/* ---------- log ---------- */
+.log{background:var(--panel2);border:1px solid var(--line);border-radius:9px;height:230px;overflow-y:auto;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;padding:6px 0}
+.entry{display:flex;gap:9px;padding:2px 10px;align-items:baseline;white-space:pre-wrap;word-break:break-word}
+.entry:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.entry .ts{color:var(--muted);flex:none;opacity:.8}
+.entry .bdg{flex:none;font-size:10px;padding:0 6px;border-radius:4px;line-height:16px;align-self:center;
+  border:1px solid var(--line);color:var(--muted);font-family:inherit}
+.entry.ok  .bdg{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,var(--line))}
+.entry.warn .bdg{color:var(--yellow);border-color:color-mix(in srgb,var(--yellow) 45%,var(--line))}
+.entry.err  .bdg{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
+.entry .msg{flex:1;min-width:0}
+.entry.err .msg{color:var(--red)}
+
+/* ---------- misc ---------- */
+.toast{position:fixed;top:66px;right:20px;background:var(--panel);border:1px solid var(--accent);
+  padding:11px 15px;border-radius:9px;z-index:1000;max-width:min(440px,90vw);font-size:13px;
+  box-shadow:var(--shadow);white-space:pre-wrap;word-break:break-word}
+.toast.bad{border-color:var(--red)} .toast.good{border-color:var(--green)}
+footer{padding:14px 20px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media(max-width:640px){
+  header{padding:10px 12px;gap:8px}
+  header h1{font-size:14px;width:100%}
+  main{padding:12px 12px 32px}
+  .hero{grid-template-columns:1fr}
+  .grid2{grid-template-columns:1fr}
+  .hcard .val{font-size:28px}
+  button{padding:6px 10px;font-size:12px}
+  #presetSeg{display:flex;flex-wrap:wrap}
+  .row{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🕐 time_sync 校时控制面板</h1>
+  <span class="pill" id="version">v-</span>
+  <span class="pill" id="adminPill">检测中…</span>
+  <span class="pill" id="connPill">连接中…</span>
+  <span class="pill" id="updatePill" style="display:none"></span>
+  <span class="spacer"></span>
+  <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="切换浅色 / 深色">🌙 深色</button>
+  <button class="secondary" onclick="queryNow()" id="queryBtn">重新检测</button>
+  <button class="secondary" onclick="loadAll(true)">刷新</button>
+  <button onclick="syncNow()" id="syncBtn">立即校准</button>
+  <button class="ghost" onclick="shutdownPanel()" title="退出面板后台进程">✕ 关闭面板</button>
+</header>
+
+<main>
+  <!-- ========== HERO ========== -->
+  <section class="hero">
+    <div class="hcard" id="heroOff">
+      <div class="cap">当前时间偏差</div>
+      <div class="val" id="heroOffVal">--<span class="unit">s</span></div>
+      <div class="sub" id="heroOffSub">等待首次检测…</div>
+    </div>
+    <div class="hcard" id="heroSrc">
+      <div class="cap">最优参考源</div>
+      <div class="val" id="heroSrcVal" style="font-size:22px">--</div>
+      <div class="sub" id="heroSrcSub">--</div>
+    </div>
+    <div class="hcard" id="heroDrift">
+      <div class="cap">晶振漂移</div>
+      <div class="val" id="heroDriftVal">--<span class="unit">ppm</span></div>
+      <div class="sub" id="heroDriftSub">日志中暂无足够记录</div>
+    </div>
+    <div class="hcard" id="heroAfter" style="display:none">
+      <div class="cap">校正后复测偏差</div>
+      <div class="val" id="heroAfterVal">--<span class="unit">s</span></div>
+      <div class="sub" id="heroAfterSub">点「立即校准」后显示</div>
+    </div>
+  </section>
+
+  <div class="uncbar" id="uncBar" style="display:none"></div>
+
+  <!-- ========== 趋势 + 健康度 ========== -->
+  <section class="grid2">
+    <div class="card">
+      <h2>偏差趋势 <span class="spacer"></span>
+        <span class="seg" id="rangeSeg">
+          <button data-n="20" class="on">近 20</button>
+          <button data-n="50">近 50</button>
+          <button data-n="200">近 200</button>
+        </span>
+      </h2>
+      <div class="chart-wrap" id="chart"><div class="empty">加载中…</div></div>
+      <div class="hint" id="chartHint">横轴＝校正时间顺序，纵轴＝偏差（秒）；黄色虚线为容差阈值，浅蓝带为合格区间。</div>
+    </div>
+
+    <div class="card">
+      <h2>时间源健康度 <span class="spacer"></span>
+        <button class="secondary sm" onclick="diagNow()" id="diagBtn">扫描</button>
+      </h2>
+      <div id="sources"><div class="empty">点「扫描」检测全部 NTP / HTTP 源</div></div>
+      <div class="hint" id="srcSummary"></div>
+    </div>
+  </section>
+
+  <!-- ========== 时间状态 + 集成 ========== -->
+  <section class="grid2 even">
+    <div class="card">
+      <h2>时间状态</h2>
+      <div class="row"><span class="label">本机时间</span><span class="value" id="localTime">--:--:--</span></div>
+      <div class="row"><span class="label">UTC 时间</span><span class="value" id="utcTime">--</span></div>
+      <div class="row"><span class="label">参考时间（最优源）</span><span class="value" id="refTime">--</span></div>
+      <div class="row"><span class="label">是否需要校正</span><span class="value" id="needSync">--</span></div>
+      <div class="row"><span class="label">上次检测</span><span class="value" id="lastCheck">--</span></div>
+      <div class="row"><span class="label">上次校正</span><span class="value" id="lastSync">从未</span></div>
+      <div class="row"><span class="label">校正结果</span><span class="value" id="lastResult">--</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Windows 集成</h2>
+      <div class="row"><span class="label">计划任务（每小时）</span>
+        <span class="flex"><span class="value" id="schedStatus">--</span>
+        <button class="secondary sm" onclick="toggleScheduler()">切换</button></span></div>
+      <div class="row"><span class="label">开机自启（注册表）</span>
+        <span class="flex"><span class="value" id="startupStatus">--</span>
+        <button class="secondary sm" onclick="toggleStartup()">切换</button></span></div>
+      <div class="row"><span class="label">w32time 系统服务</span>
+        <span class="flex"><span class="value" id="w32Status">--</span>
+        <button class="secondary sm" onclick="toggleW32()">切换</button></span></div>
+      <div class="row" style="border:0"><span class="label">漂移报告</span>
+        <span class="flex"><button class="secondary sm" onclick="driftReport()">查看</button></span></div>
+      <div class="hint">计划任务 / 开机自启 / 停用 w32time 需要管理员权限；非管理员时会自动申请提权。</div>
+    </div>
+  </section>
+
+  <!-- ========== 日志 ========== -->
+  <section>
+    <div class="card" id="logCard">
+      <h2>实时日志 <span class="pill" id="logCount">0 条</span><span class="spacer"></span>
+        <span class="fold" onclick="toggleFold('logCard')" id="logFold">收起 ▴</span>
+        <button class="secondary sm" onclick="clearLog()">清屏</button>
+        <button class="secondary sm" onclick="copyLog()">复制</button>
+        <button class="secondary sm" onclick="downloadLog()">下载</button>
+      </h2>
+      <div class="body"><div class="log" id="log"></div>
+      <div class="hint">通过 SSE 长连接实时推送，页面关闭即断开，不会反复重连。</div></div>
+    </div>
+  </section>
+
+  <!-- ========== 配置（次要，下移） ========== -->
+  <section class="grid2 even" style="margin-top:14px">
+    <div class="card">
+      <h2>时间源配置</h2>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <span class="label">NTP 服务器（逗号分隔）</span>
+        <input type="text" id="ntpInput" placeholder="ntp.aliyun.com,ntp.tencent.com">
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <span class="label">HTTP 兜底源（逗号分隔）</span>
+        <input type="text" id="httpInput" placeholder="https://www.baidu.com,https://www.taobao.com">
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <span class="label">时间源预设分组（一键切换 NTP）</span>
+        <div class="seg" id="presetSeg"></div>
+      </div>
+      <div class="row" style="gap:8px">
+        <div style="flex:1"><span class="label">容差阈值（秒）</span>
+          <input type="number" id="threshold" min="0.05" step="0.05"></div>
+        <div style="flex:1"><span class="label">超时（秒）</span>
+          <input type="number" id="timeout" min="0.5" step="0.5"></div>
+        <div style="flex:1"><span class="label">重试次数</span>
+          <input type="number" id="retries" min="0" step="1"></div>
+        <div style="flex:1"><span class="label">计划间隔（分）</span>
+          <input type="number" id="interval" min="1" step="1" placeholder="60"></div>
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <span class="label">日志文件路径</span>
+        <input type="text" id="logPath" placeholder="默认同目录 校正日志.txt（留空=恢复默认）">
+      </div>
+      <div class="row">
+        <span class="label">平滑校时（避免时钟突跳）</span>
+        <span class="flex"><label style="display:flex;align-items:center;gap:6px;font-size:12px">
+          <input type="checkbox" id="slew" style="width:auto"> 开启</label>
+          <input type="number" id="slewMax" min="1" step="1" style="max-width:90px" title="偏差在此秒数内才分段逼近">
+          <span class="muted" style="font-size:11px">秒内</span>
+        </span>
+      </div>
+      <div class="hint">平滑校时把偏差拆成 10 个小步进逼近目标，适合对时钟连续性敏感的场景；超过设定秒数仍会一次性校正。</div>
+      <div class="row" style="border:0;justify-content:flex-end">
+        <button class="secondary" onclick="loadConfig()">还原</button>
+        <button onclick="saveConfig()">保存配置</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>环境信息</h2>
+      <div class="row"><span class="label">程序版本</span><span class="value" id="envVersion">--</span></div>
+      <div class="row"><span class="label">操作系统</span><span class="value" id="envOs">--</span></div>
+      <div class="row"><span class="label">运行权限</span><span class="value" id="envAdmin">--</span></div>
+      <div class="row"><span class="label">配置文件</span><span class="value" id="envCfg" style="font-size:11px;max-width:60%;word-break:break-all">--</span></div>
+      <div class="row"><span class="label">日志文件</span><span class="value" id="envLog" style="font-size:11px;max-width:60%;word-break:break-all">--</span></div>
+      <div class="hint">面板仅监听 127.0.0.1，外部机器无法访问。配置保存后立即写入 ini 文件。</div>
+    </div>
+  </section>
+</main>
+
+<footer>time_sync 控制面板 · 监听 127.0.0.1:8765 · 仅本机访问</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let curThreshold=0.5, histRange=20, lastStatus=null, logEntries=0;
+
+/* ---------------- theme ---------------- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('ts_theme',t);
+  const b=$('themeBtn'); b.textContent = t==='dark' ? '🌙 深色' : '☀️ 浅色';
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+}
+(function initTheme(){
+  let t=localStorage.getItem('ts_theme');
+  if(!t) t=window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  applyTheme(t);
+})();
+
+/* ---------------- utils ---------------- */
+function toast(msg,kind){
+  const d=document.createElement('div');
+  d.className='toast'+(kind?' '+kind:'');
+  d.textContent=msg; document.body.appendChild(d);
+  setTimeout(()=>{d.style.transition='opacity .3s';d.style.opacity='0';setTimeout(()=>d.remove(),300)},3600);
+}
+function setConn(state){
+  const p=$('connPill');
+  if(state==='live'){p.className='pill ok';p.textContent='● 实时连接';}
+  else if(state==='connecting'){p.className='pill';p.textContent='连接中…';}
+  else if(state==='retry'){p.className='pill warn';p.textContent='重连中…';}
+  else {p.className='pill bad';p.textContent='断连';}
+}
+function offClass(v){const a=Math.abs(v);return a<1?'good':a<10?'mid':'bad';}
+function fmtOff(v,digits){
+  if(v==null) return '--';
+  const d=digits==null?3:digits;
+  return (v>=0?'+':'') + v.toFixed(d);
+}
+function fmtMs(s){ return s==null?'--' : (s<1? Math.round(s*1000)+' ms' : s.toFixed(2)+' s'); }
+function stamp(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+
+/* ---------------- api ---------------- */
+// 面板访问令牌：仅在"远程 / 局域网"访问且服务端配置了 api_token 时才需要。
+// 从 URL ?token=... 读取（本机 127.0.0.1 访问始终免 token）。
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+
+async function api(path,opts){
+  opts=opts||{};
+  const h=Object.assign({'Content-Type':'application/json'},opts.headers||{});
+  if(TOKEN) h['X-API-Token']=TOKEN; // 携带令牌（本机访问 TOKEN 为空，自动跳过）
+  opts.headers=h;
+  let r,j;
+  try{ r=await fetch(path,opts); }catch(e){ setConn('down'); throw new Error('网络不可达'); }
+  try{ j=await r.json(); }catch(e){ j={}; }
+  if(!r.ok){ toast(j.error||('请求失败 '+r.status),'bad'); throw new Error(j.error||r.statusText); }
+  return j;
+}
+// 轮询直到 running 变 false（最多 90 秒）
+async function waitIdle(){
+  for(let i=0;i<180;i++){
+    await new Promise(r=>setTimeout(r,700));
+    try{
+      const r=await fetch('/api/status'); const s=await r.json();
+      renderStatus(s);
+      if(!s.running) return s;
+    }catch(e){ return null; }
+  }
+  return null;
+}
+
+/* ---------------- status / hero ---------------- */
+function renderStatus(j){
+  lastStatus=j;
+  $('version').textContent='v'+j.version;
+  $('envVersion').textContent='v'+j.version;
+  $('envOs').textContent=j.os;
+  $('envAdmin').innerHTML=j.is_admin?'<span class="good">管理员</span>':'<span class="mid">非管理员</span>';
+  $('adminPill').textContent=j.is_admin?'管理员':'非管理员';
+  $('adminPill').className='pill '+(j.is_admin?'ok':'warn');
+  $('envLog').textContent=j.log_path||'（未配置 / 已关闭）';
+  $('envCfg').textContent=j.config_path||'--';
+
+  $('localTime').textContent=j.local_time;
+  $('utcTime').textContent=j.utc_time;
+  $('refTime').textContent=j.reference_time||'--';
+  $('needSync').innerHTML=j.need_sync?'<span class="bad">需要校正</span>':'<span class="good">无需校正</span>';
+  $('lastCheck').textContent=stamp();
+  $('lastSync').textContent=j.last_sync||'从未';
+  const lr=j.last_result||'';
+  $('lastResult').innerHTML=lr==='ok'?'<span class="good">成功</span>':lr==='skip'?'<span class="muted">跳过</span>':lr==='fail'?'<span class="bad">失败</span>':'--';
+  $('updatePill').style.display='';
+  $('updatePill').textContent='更新于 '+stamp();
+
+  // hero 1: 偏差
+  const has=j.reference_source || j.last_sync;
+  if(has){
+    const v=j.offset_seconds, cls=offClass(v);
+    $('heroOff').className='hcard '+cls;
+    $('heroOffVal').className='val '+cls;
+    $('heroOffVal').innerHTML=fmtOff(v)+'<span class="unit">s</span>';
+    $('heroOffSub').textContent='参考源 − 本机（负数＝本机偏快）'+(j.need_sync?' · 超过容差阈值，建议校准':' · 在容差范围内');
+  }
+  // hero 2: 最优源
+  if(j.reference_source){
+    $('heroSrcVal').textContent=j.reference_source;
+    $('heroSrcVal').className='val good';
+    $('heroSrcSub').textContent='参考时间 '+(j.reference_time||'--');
+  }
+  // hero 3: 漂移
+  if(j.drift_ppm!=null){
+    const p=j.drift_ppm, a=Math.abs(p);
+    const cls=a<20?'good':a<100?'mid':'bad';
+    $('heroDrift').className='hcard '+cls;
+    $('heroDriftVal').className='val '+cls;
+    $('heroDriftVal').innerHTML=(p>=0?'+':'')+p.toFixed(1)+'<span class="unit">ppm</span>';
+    $('heroDriftSub').textContent=a<20?'晶振稳定':a<100?'轻微漂移':'漂移偏大，建议缩短校准周期';
+  }
+  // hero 4: 校正后复测偏差（仅校时动作后展示；查询动作不显示，避免把 0 当"已校准"）
+  if(j.after_off!=null){
+    const ao=j.after_off, acls=offClass(ao);
+    const el=$('heroAfter'); el.style.display='';
+    el.className='hcard '+acls;
+    $('heroAfterVal').className='val '+acls;
+    $('heroAfterVal').innerHTML=fmtOff(ao)+'<span class="unit">s</span>';
+    $('heroAfterSub').textContent=Math.abs(ao)<0.05?'校准到位，时钟已对齐':'仍有残余偏差，可再校一次';
+  } else if(j.did_sync && j.recheck_ok===false){
+    // 校时成功但复测因网络抖动失败：不应显示 0.000s（会误判"校准到位"），改为明确提示
+    const el=$('heroAfter'); el.style.display='';
+    el.className='hcard mid';
+    $('heroAfterVal').className='val mid';
+    $('heroAfterVal').innerHTML='—';
+    $('heroAfterSub').textContent='复测未执行（网络抖动，时钟已写入，建议稍后再校一次确认）';
+  } else {
+    $('heroAfter').style.display='none';
+  }
+  // 不确定度（交叉验证）：多个可用源之间的离散程度
+  const u=j.uncertainty||{};
+  const uncEl=$('uncBar');
+  if(u.count>=2){
+    uncEl.style.display='';
+    uncEl.innerHTML=`交叉验证：基于 <b>${u.count}</b> 个可用源，偏差离散 <b>±${(u.spread/2*1000).toFixed(1)} ms</b>（标准差 ${(u.std*1000).toFixed(1)} ms）`;
+  } else if(u.count===1){
+    uncEl.style.display='';
+    uncEl.innerHTML='仅 1 个可用源，无法进行交叉验证，建议增加时间源以提高可靠性';
+  } else {
+    uncEl.style.display='none';
+  }
+
+  renderSources(j.sources);
+}
+
+/* ---------------- sources ---------------- */
+function renderSources(list){
+  const box=$('sources');
+  if(!list || !list.length){ box.innerHTML='<div class="empty">点「扫描」检测全部 NTP / HTTP 源</div>'; $('srcSummary').textContent=''; return; }
+  const maxD=Math.max(...list.filter(s=>s.ok).map(s=>s.delay||0),0.001);
+  let ok=0;
+  const html=list.map(s=>{
+    if(s.ok) ok++;
+    const w=s.ok? Math.max(4,Math.round((s.delay/maxD)*100)) : 100;
+    const off = s.ok? fmtOff(s.offset) : '—';
+    const cls = s.ok? offClass(s.offset) : 'bad';
+    return `<div class="src ${s.ok?'ok':'fail'}" title="${esc(s.error||'')}">
+      <span class="dot"></span>
+      <span class="name">${esc(s.server)}</span>
+      <span class="kind">${esc((s.kind||'').toUpperCase())}</span>
+      <span class="off ${cls}">${off}</span>
+      <span class="bar"><i style="width:${w}%"></i></span>
+      <span class="dly">${s.ok?fmtMs(s.delay):'—'}</span>
+    </div>`;
+  }).join('');
+  box.innerHTML=html;
+  $('srcSummary').textContent=`${ok}/${list.length} 个源可用 · 延迟条为相对值（越短越好）`;
+}
+
+/* ---------------- chart ---------------- */
+function niceCeil(v){
+  if(v<=0) return 1;
+  const e=Math.pow(10,Math.floor(Math.log10(v))), m=v/e;
+  const s=m<=1?1:m<=2?2:m<=5?5:10;
+  return s*e;
+}
+function renderChart(points){
+  const el=$('chart');
+  if(!points || points.length===0){
+    el.innerHTML='<div class="empty">暂无校正记录 —— 执行一次「立即校准」后这里会出现趋势曲线</div>';
+    return;
+  }
+  const W=780,H=230,pl=56,pr=16,pt=14,pb=30;
+  const iw=W-pl-pr, ih=H-pt-pb;
+  const vals=points.map(p=>p.offset);
+  const thr=curThreshold>0?curThreshold:0.5;
+  let mx=niceCeil(Math.max(...vals.map(Math.abs), thr*1.25, 0.05));
+  const Y=v=>pt+ih/2-(v/mx)*(ih/2);
+  const n=points.length;
+  const X=i=> n===1? pl+iw/2 : pl+(i/(n-1))*iw;
+  const p=(v,d)=>v.toFixed(d==null?2:d);
+
+  let g='';
+  // 容差带
+  g+=`<rect class="band" x="${pl}" y="${Y(thr)}" width="${iw}" height="${Math.max(0,Y(-thr)-Y(thr))}"/>`;
+  // 网格 + y 轴标签
+  [-1,-0.5,0,0.5,1].forEach(f=>{
+    const v=mx*f, y=Y(v);
+    g+=`<line class="gl${f===0?' zero':''}" x1="${pl}" y1="${p(y)}" x2="${pl+iw}" y2="${p(y)}"/>`;
+    g+=`<text class="ax" x="${pl-8}" y="${p(y+4)}" text-anchor="end">${f===0?'0':(v>0?'+':'')+v.toFixed(2)}</text>`;
+  });
+  // 阈值虚线
+  [thr,-thr].forEach(t=>{
+    if(t<mx){ g+=`<line class="thr" x1="${pl}" y1="${p(Y(t))}" x2="${pl+iw}" y2="${p(Y(t))}"/>`; }
+  });
+  // 面积 + 折线
+  const pts=points.map((d,i)=>`${p(X(i))},${p(Y(d.offset))}`).join(' ');
+  if(n>1){
+    g+=`<polygon class="area" points="${p(X(0))},${p(Y(0))} ${pts} ${p(X(n-1))},${p(Y(0))}"/>`;
+    g+=`<polyline class="series" points="${pts}"/>`;
+  }
+  // 点 + hover
+  const showDot=n<=60;
+  points.forEach((d,i)=>{
+    if(!showDot) return;
+    const t=`${d.ts||''} · ${d.server||''} · 偏差 ${fmtOff(d.offset)} s · 延迟 ${fmtMs(d.delay)}`;
+    g+=`<circle class="dot" cx="${p(X(i))}" cy="${p(Y(d.offset))}" r="${n<=30?3.2:2.2}"><title>${esc(t)}</title></circle>`;
+  });
+  // x 轴首尾
+  const fmtTs=s=>s?s.slice(5,16):'';
+  g+=`<text class="ax" x="${pl}" y="${H-10}">${esc(fmtTs(points[0].ts))}</text>`;
+  if(n>1) g+=`<text class="ax" x="${pl+iw}" y="${H-10}" text-anchor="end">${esc(fmtTs(points[n-1].ts))}</text>`;
+  g+=`<text class="ax" x="${pl+iw/2}" y="${H-10}" text-anchor="middle">${n} 次校正</text>`;
+
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="偏差趋势图">${g}</svg>`;
+}
+async function loadHistory(){
+  try{
+    const j=await api('/api/history?n='+histRange);
+    renderChart(j.points||[]);
+  }catch(e){}
+}
+
+/* ---------------- log ---------------- */
+function pushLog(raw){
+  if(!raw) return;
+  const box=$('log');
+  const m=/^(\d{4}-\d{2}-\d{2} )?(\d{2}:\d{2}:\d{2})(?:\s*[+-]\d{4})?\s*(.*)$/.exec(raw);
+  let ts='', msg=raw;
+  if(m){ ts=m[2]; msg=m[3]||raw; }
+  if(!msg.trim()) return;
+  let lvl='info', lb='信息';
+  if(/失败|错误|异常|不可用|拒绝|denied|fail/i.test(msg)){ lvl='err'; lb='错误'; }
+  else if(/跳过|警告|超时|剔除|未配置|无日志|warn/i.test(msg)){ lvl='warn'; lb='警告'; }
+  else if(/校正|成功|已|采用|✓|ok/i.test(msg)){ lvl='ok'; lb='完成'; }
+
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const d=document.createElement('div');
+  d.className='entry '+lvl;
+  d.innerHTML=`<span class="ts">${esc(ts||stamp())}</span><span class="bdg">${lb}</span><span class="msg">${esc(msg)}</span>`;
+  box.appendChild(d);
+  logEntries++;
+  while(logEntries>500 && box.firstChild){ box.removeChild(box.firstChild); logEntries--; }
+  $('logCount').textContent=logEntries+' 条';
+  if(nearBottom) box.scrollTop=box.scrollHeight;
+}
+function clearLog(){ $('log').innerHTML=''; logEntries=0; $('logCount').textContent='0 条'; }
+function copyLog(){
+  const txt=[...$('log').querySelectorAll('.entry')].map(e=>e.textContent).join('\n');
+  if(!txt){ toast('日志为空'); return; }
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>toast('已复制到剪贴板','good'),()=>toast('复制失败','bad'));
+  else toast('当前浏览器不支持自动复制');
+}
+function downloadLog(){
+  const txt=[...$('log').querySelectorAll('.entry')].map(e=>e.textContent).join('\n');
+  if(!txt){ toast('日志为空'); return; }
+  const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='timesync_log_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('已下载日志文件','good');
+}
+function toggleFold(id){ const c=$(id); c.classList.toggle('folded'); $('logFold').textContent=c.classList.contains('folded')?'展开 ▾':'收起 ▴'; }
+
+/* ---------------- SSE ---------------- */
+let es=null, esDelay=1000, esTimer=null;
+function startLogStream(){
+  if(es){ try{es.close()}catch(e){} es=null; }
+  setConn('connecting');
+  try{ es=new EventSource('/api/log/stream'+(TOKEN?'?token='+encodeURIComponent(TOKEN):'')); }catch(e){ setConn('down'); return; }
+  es.onopen=()=>{ esDelay=1000; setConn('live'); };
+  es.onmessage=e=>{ if(esDelay!==1000) esDelay=1000; setConn('live'); pushLog(e.data); };
+  es.onerror=()=>{
+    if(es){ try{es.close()}catch(e){} es=null; }
+    setConn('retry');
+    clearTimeout(esTimer);
+    esTimer=setTimeout(startLogStream, esDelay);
+    esDelay=Math.min(esDelay*2, 30000);
+  };
+}
+
+/* ---------------- actions ---------------- */
+async function loadStatus(){ const j=await api('/api/status'); renderStatus(j); setConn('live'); return j; }
+async function loadConfig(){
+  const j=await api('/api/config');
+  $('ntpInput').value=(j.ntp||[]).join(', ');
+  $('httpInput').value=(j.http||[]).join(', ');
+  $('threshold').value=j.threshold||'';
+  $('timeout').value=j.timeout||'';
+  $('retries').value=j.retries!=null?j.retries:'';
+  $('logPath').value=j.log||'';
+  $('interval').value=j.interval>0?j.interval:'';
+  $('slew').checked=!!j.slew;
+  $('slewMax').value=(j.slew_max>0?j.slew_max:60);
+  curThreshold=j.threshold||0.5;
+  loadPresets();
+}
+
+let presets=[];
+async function loadPresets(){
+  try{
+    const j=await api('/api/presets');
+    presets=j||[];
+    const seg=$('presetSeg');
+    if(!presets.length){ seg.innerHTML='<span class="hint">无预设分组</span>'; return; }
+    seg.innerHTML=presets.map((p,i)=>`<button onclick="applyPreset(${i})" title="${esc((p.ntp||[]).join(', '))}">${esc(p.name)}</button>`).join('');
+  }catch(e){}
+}
+async function applyPreset(i){
+  const p=presets[i]; if(!p) return;
+  $('ntpInput').value=(p.ntp||[]).join(', ');
+  try{
+    await api('/api/config',{method:'POST',body:JSON.stringify({ntp:(p.ntp||[]).slice()})});
+    toast('已应用预设「'+(p.name||'')+'」，正在重新检测…','good');
+    await loadConfig();
+    await queryNow();
+  }catch(e){}
+}
+async function loadIntegrations(){
+  try{
+    const j=await api('/api/integrations');
+    $('schedStatus').innerHTML=j.scheduler?'<span class="good">已注册</span>':'<span class="muted">未注册</span>';
+    $('startupStatus').innerHTML=j.startup?'<span class="good">已启用</span>':'<span class="muted">未启用</span>';
+    const w=j.w32time||'unknown';
+    const map={running:['运行中','mid'],stopped:['已停止','muted'],disabled:['已停用','good'],unknown:['未知','muted'],unsupported:['非 Windows','muted']};
+    const m=map[w]||[w,'muted'];
+    $('w32Status').innerHTML=`<span class="${m[1]}">${m[0]}</span>`;
+  }catch(e){}
+}
+async function queryNow(){
+  const b=$('queryBtn'); b.disabled=true; b.textContent='检测中…';
+  try{
+    await api('/api/query',{method:'POST'});
+    await waitIdle();
+    await loadHistory();
+  }catch(e){}
+  finally{ b.disabled=false; b.textContent='重新检测'; }
+}
+async function syncNow(){
+  const b=$('syncBtn');
+  if(!confirm('将把本机系统时间校正到参考时间。需要管理员权限，确定继续？')) return;
+  b.disabled=true; b.textContent='校准中…';
+  try{
+    let j=await api('/api/sync',{method:'POST',body:JSON.stringify({allow_back:false})});
+    // 需要大幅回拨时钟：把"回拨多少秒"讲清楚再让用户确认，避免静默倒退时钟
+    if(j && j.status==='need_confirm'){
+      const msg=(j.message||'本次需要把时钟回拨')+
+        '\n\n回拨幅度：'+fmtOff(j.offset,3)+' 秒'+
+        '\n\n时钟倒退可能影响计划任务触发、证书有效期校验与日志时序。';
+      if(!confirm('⚠️ 回拨确认\n\n'+msg+'\n\n确定继续吗？')){
+        toast('已取消，未修改系统时间','mid'); return;
+      }
+      j=await api('/api/sync',{method:'POST',body:JSON.stringify({allow_back:true})});
+    }
+    if(j && j.status==='elevating'){
+      toast('已申请管理员权限，请在 UAC 弹窗点『是』，校准会在新进程里执行…','good');
+      // 提权子进程独立执行，本面板只能轮询状态看时钟被拨回
+      for(let i=0;i<10;i++){
+        await new Promise(r=>setTimeout(r,1500));
+        try{ await loadStatus(); }catch(e){}
+      }
+      await loadHistory();
+      toast('校准流程已执行，请看顶部偏差是否归零','good');
+      return;
+    }
+    const s=await waitIdle();
+    await loadHistory();
+    await loadStatus();
+    if(s && s.last_result==='fail') toast('校准失败，请查看日志','bad');
+    else toast('校准完成','good');
+    // 非致命告警（如 w32time 正在运行会覆盖校正结果）
+    if(s && s.warning) toast('⚠ '+s.warning,'mid');
+  }catch(e){}
+  finally{ b.disabled=false; b.textContent='立即校准'; }
+}
+async function diagNow(){
+  const b=$('diagBtn'); b.disabled=true; b.textContent='扫描中…';
+  try{ await api('/api/diag',{method:'POST'}); await waitIdle(); toast('时间源扫描完成','good'); }
+  catch(e){}
+  finally{ b.disabled=false; b.textContent='扫描'; }
+}
+async function saveConfig(){
+  const cfg={
+    ntp:$('ntpInput').value.split(/[,，;；\s]+/).map(s=>s.trim()).filter(Boolean),
+    http:$('httpInput').value.split(/[,，;；\s]+/).map(s=>s.trim()).filter(Boolean),
+    threshold:parseFloat($('threshold').value)||undefined,
+    timeout:parseFloat($('timeout').value)||undefined,
+    log:$('logPath').value.trim(),
+  };
+  const r=parseInt($('retries').value,10);
+  if(!isNaN(r)) cfg.retries=r;
+  // 计划间隔：表单里有这个输入框，但此前 saveConfig 一直没把它发出去，
+  // 导致面板改了"计划间隔"保存后其实没落到 ini。
+  const iv=parseInt($('interval').value,10);
+  if(!isNaN(iv)&&iv>0) cfg.interval=iv;
+  // 平滑校时
+  cfg.slew=!!$('slew').checked;
+  const sm=parseInt($('slewMax').value,10);
+  cfg.slew_max=(!isNaN(sm)&&sm>0)?sm:60;
+  await api('/api/config',{method:'POST',body:JSON.stringify(cfg)});
+  await loadConfig();
+  toast('配置已保存到 ini 文件，正在重新检测…','good');
+  await queryNow();
+}
+async function toggleScheduler(){ const j=await api('/api/scheduler/toggle',{method:'POST'}); if(j&&j.status==='elevating'){ toast('已申请管理员权限，正在应用…','good'); pollIntegrations(); return; } await loadIntegrations(); }
+async function toggleStartup(){ const j=await api('/api/startup/toggle',{method:'POST'}); if(j&&j.status==='elevating'){ toast('已申请管理员权限，正在应用…','good'); pollIntegrations(); return; } await loadIntegrations(); }
+async function toggleW32(){ const j=await api('/api/w32time/toggle',{method:'POST'}); if(j&&j.status==='elevating'){ toast('已申请管理员权限，正在应用…','good'); pollIntegrations(); return; } await loadIntegrations(); }
+// 提权后子进程要等 UAC 确认+执行，状态不会立刻变化；这里轮询一段时间让面板自动跟上。
+function pollIntegrations(){
+  let n=0;
+  const t=setInterval(async ()=>{
+    if(++n>8){ clearInterval(t); return; }
+    try{ await loadIntegrations(); }catch(e){}
+  },1500);
+}
+async function driftReport(){
+  const j=await api('/api/drift?tail=12');
+  toast(j.text||'暂无记录');
+}
+async function shutdownPanel(){
+  if(!confirm('关闭后本页面将无法再连接（面板后台进程退出）。\n下次可在 timesync.exe 菜单里按 w 重新打开。确定关闭？')) return;
+  try{
+    await api('/api/shutdown',{method:'POST'});
+    toast('正在关闭面板…若正有任务在运行，最多等 8 秒','good');
+    if(es){ try{es.close()}catch(e){} es=null; }
+    setTimeout(()=>setConn('down'),900);
+  }catch(e){}
+}
+
+async function loadAll(manual){
+  try{
+    await Promise.all([loadStatus(),loadConfig(),loadIntegrations(),loadHistory()]);
+    if(manual) toast('已刷新','good');
+  }catch(e){ setConn('down'); }
+  // 首次打开：从未检测过则自动跑一次（只查询，不改时钟）
+  if($('lastSync').textContent==='从未' && !lastStatus?.last_sync){ queryNow(); }
+}
+
+/* ---------------- range seg ---------------- */
+$('rangeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  [...$('rangeSeg').children].forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); histRange=parseInt(b.dataset.n,10); loadHistory();
+});
+
+/* ---------------- boot ---------------- */
+loadAll();
+startLogStream();
+setInterval(()=>{
+  if(document.hidden) return;
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  $('localTime').textContent=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+},1000);
+setInterval(()=>{ if(!document.hidden) loadStatus().catch(()=>setConn('down')); },15000);
+setInterval(()=>{ if(!document.hidden) loadHistory(); },60000);
+</script>
+</body>
+</html>

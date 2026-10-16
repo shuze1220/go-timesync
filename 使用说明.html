@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动校时工具 time_sync（Go 版）· 使用说明</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1f2733; --sub:#5b6776;
+    --brand:#2f7cf6; --brand2:#0fb37a; --warn:#e8920c; --line:#e4e9f0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.7;padding:28px 16px}
+  .wrap{max-width:760px;margin:0 auto}
+  .hero{background:linear-gradient(135deg,#2f7cf6,#0fb37a);color:#fff;border-radius:16px;
+    padding:26px 28px;box-shadow:0 8px 24px rgba(47,124,246,.18)}
+  .hero h1{margin:0 0 6px;font-size:24px}
+  .hero p{margin:0;opacity:.92;font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:20px 22px;margin:18px 0;box-shadow:0 2px 8px rgba(31,39,51,.04)}
+  .card h2{margin:0 0 12px;font-size:17px;display:flex;align-items:center;gap:8px}
+  .tag{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;color:#fff}
+  .t-blue{background:var(--brand)} .t-green{background:var(--brand2)} .t-orange{background:var(--warn)}
+  .step{display:flex;gap:12px;margin:12px 0;align-items:flex-start}
+  .num{flex:0 0 26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  code{background:#eef2f8;color:#1f2733;padding:2px 7px;border-radius:6px;
+    font-family:"Cascadia Code",Consolas,monospace;font-size:13px}
+  pre{background:#0f1726;color:#d6e2f5;padding:14px 16px;border-radius:10px;overflow:auto;
+    font-size:13px;line-height:1.55}
+  .note{border-left:4px solid var(--warn);background:#fff7ea;padding:12px 14px;
+    border-radius:0 10px 10px 0;font-size:13.5px;color:#7a5410}
+  .ok{border-left-color:var(--brand2);background:#ecfbf3;color:#1c6b48}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:600;background:#fafbfd}
+  footer{text-align:center;color:var(--sub);font-size:12px;margin:22px 0 6px}
+  a{color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>⏱ 自动校时工具 time_sync（Go 版 v1.0.0）</h1>
+    <p>通过 NTP 网络时间协议校准电脑系统时钟 · 单文件 exe · 免安装 · 内置 Web 控制面板</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag t-blue">三种用法</span></h2>
+    <div class="step"><span class="num">1</span><div>
+      <b>双击即用（推荐新手）</b>：双击 <code>timesync.exe</code> 进入控制台菜单，按 <code>w</code> 即可打开 Web 控制面板，浏览器会自动弹出；面板后台独立运行，<b>关掉那个黑窗口也不影响面板</b>。</div></div>
+    <div class="step"><span class="num">2</span><div>
+      <b>命令行（适合脚本/计划任务）</b>：在终端里跑 <code>timesync.exe --query</code> 查询偏差，<code>timesync.exe --sync</code> 校正。</div></div>
+    <div class="step"><span class="num">3</span><div>
+      <b>直接开面板</b>：<code>timesync.exe --web</code> 跳过菜单直接起面板并打开浏览器。</div></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag t-green">Web 控制面板</span></h2>
+    <p>启动后地址是 <code>http://127.0.0.1:8765/</code>（若该端口被占用会自动顺延，以控制台打印的地址为准）。面板包含：</p>
+    <table>
+      <tr><th>区块</th><th>功能</th></tr>
+      <tr><td>顶部大数字</td><td>当前偏差 / 最优参考源 / 晶振漂移，按阈值自动变色</td></tr>
+      <tr><td>不确定度提示</td><td>多源交叉验证：显示各可用源的离散程度（±极差/2 ms 与总体标准差）。数据源 ≥2 时才有统计意义，单源时提示「仅单源，无法交叉验证」</td></tr>
+      <tr><td>预设分组</td><td>一键切换「国内常用 / 全球 / 教育网 / Windows 默认」时间源组合，省去手动改服务器</td></tr>
+      <tr><td>偏差趋势</td><td>最近 20/50/200 次校正的偏差曲线，带容差带与阈值虚线</td></tr>
+      <tr><td>时间源健康度</td><td>逐个探测 NTP / HTTP 源，显示可用状态与延迟</td></tr>
+      <tr><td>时间状态</td><td>本机 / UTC / 参考时间、当前偏差、是否需要校正、上次校正结果；校时后还会显示<b>「校正后复测偏差」</b>卡片，用红/黄/绿直观反映时钟是否真的对齐（查询动作不显示，避免把 0 误读为已校准）</td></tr>
+      <tr><td>实时日志</td><td>后台推送的校准日志（错误/警告分级、可折叠复制）</td></tr>
+      <tr><td>时间源配置</td><td>改 NTP / HTTP 服务器、阈值、超时、重试、日志路径、计划间隔；还可开启<b>平滑校时</b>（见下）。「计划任务间隔」填分钟数（默认 60）</td></tr>
+      <tr><td>回拨确认</td><td>当校正需要把时钟<b>往回拨超过 60 秒</b>时，面板会先弹出确认框，明确告知回拨幅度与影响（计划任务触发、证书校验、日志时序），确认后才会执行——不会静默倒退时钟</td></tr>
+      <tr><td>冲突提醒</td><td>若系统时间服务 <code>w32time</code> 正在运行，校正后会提示「可能周期性覆盖本次校正结果」，建议先停用（菜单 11）</td></tr>
+      <tr><td>远程访问令牌</td><td>仅在「远程 / 局域网」打开面板时才需要：<code>timesync.exe --set-token</code> 生成随机令牌写入 <code>配置.ini</code>；之后局域网访问面板地址后加 <code>?token=...</code> 或请求头带 <code>X-API-Token</code>。<b>本机 127.0.0.1 访问始终免令牌</b>，保持开箱即用</td></tr>
+      <tr><td>Windows 集成</td><td>计划任务 / 开机自启 / w32time 开关；计划任务间隔可在面板直接配置，保存后立即生效</td></tr>
+    </table>
+    <div class="note"><b>怎么关掉面板？</b>在面板右上角点「✕ 关闭面板」即可（面板是独立后台进程，用任务管理器结束 <code>timesync.exe</code> 也可以）。关掉控制台黑窗口<b>不会</b>停止面板。</div>
+    <div class="note ok">面板只监听 <code>127.0.0.1</code>（本机回环），不会对外暴露。不想自动开浏览器就加 <code>--no-open</code>。右上角可切换浅色 / 深色主题。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag t-blue">常用命令</span></h2>
+    <pre># 查询偏差（不改时间）
+timesync.exe --query
+
+# 立即校正（校正系统时间需要管理员，会弹 UAC）
+timesync.exe --sync
+
+# 每 60 分钟自动校准
+timesync.exe --loop --interval 60
+
+# 只起 Web 面板（跳过菜单）
+timesync.exe --web --no-open
+
+# 换端口起面板（默认 8765 被占用时会自动顺延）
+timesync.exe --web --listen 127.0.0.1:8899
+
+# 注册计划任务（每小时自动校准，无需开着程序）
+timesync.exe --install-scheduler
+
+# 开机自动校准
+timesync.exe --install-startup</pre>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag t-orange">关于权限</span></h2>
+    <div class="note">「查询偏差」不需要管理员，双击即用。但「校正系统时间」必须管理员/root：程序会在需要时自动弹出 UAC 请求，点「是」即可。</div>
+    <div class="ok" style="margin-top:10px">若 UAC 被取消，程序不会消失无响应，而是提示「权限不足」可重试；提权后已自动记住你选的功能，无需再选一次。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag t-orange">面板按钮的提权流程</span></h2>
+    <p>面板里点「计划任务 / 开机自启 / w32time」这些需要管理员的功能时，<b>不需要自己开管理员控制台</b>——面板会自动用 UAC 提权重开一个后台进程去执行，你只要点「是」授权即可。</p>
+    <div class="step"><span class="num">1</span><div>在面板点开关 → 浏览器弹出 UAC 请求 → 选「是」。</div></div>
+    <div class="step"><span class="num">2</span><div>程序用带标签的提权重开（例如 <code>scheduler:install</code> / <code>startup:install</code> / <code>w32time:disable</code>），精确执行你刚点的那一项。</div></div>
+    <div class="step"><span class="num">3</span><div>因为 UAC 有延迟，面板会自己轮询约 12 秒回读最新状态（最多 8 次），状态自动刷新，<b>无需手动刷新页面</b>。</div></div>
+    <div class="note">提权重开的进程会继承面板的监听地址和隐藏参数，但不会再弹浏览器；它只执行那一个动作，执行完就退出，不影响已经在跑的面板。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag t-blue">配置文件 配置.ini</span></h2>
+    <p>放在 <code>timesync.exe</code> 同目录会自动加载。想换时间源、调阈值、改日志路径，改这里就行：</p>
+    <pre>[servers]
+ntp  = ntp.aliyun.com, time.windows.com, ...
+http = https://www.baidu.com, https://www.qq.com, ...
+
+[sync]
+timeout   = 5      ; 单源超时（秒）
+threshold = 0.5    ; 偏差小于此值不写时钟
+retries   = 2      ; 每源重试次数
+log       = 校正日志.txt   ; 相对路径按 exe 所在目录解析；留空=不记录
+slew      = false  ; 平滑校时：偏差在 slew_max 秒内分段逼近，避免时钟突跳
+slew_max  = 60     ; 平滑校时适用的最大偏差（秒），超过则一次性校正
+interval  = 60     ; 计划任务间隔（分钟，>0 生效）</pre>
+    <p style="color:var(--sub);font-size:13px">命令行参数优先于配置文件，配置文件优先于内置默认值。<b>日志文件默认就写在 exe 同目录</b>（<code>校正日志.txt</code>），无需手动配置即可记录，偏差趋势与漂移报告（ppm）开箱可用。</p>
+    <div class="note">「平滑校时」把偏差拆成 10 个小步进逼近目标，适合对时钟连续性敏感的场景；关闭（默认）时是一次性写入，行为更可预测。偏差超过 <code>slew_max</code> 秒时一律一次性校正。</div>
+  </div>
+
+  <footer>time_sync Go 版 v1.0.0 · 单文件 exe · 多源交叉不确定度 · 预设分组 · 间隔可配 · 面板一键提权 · 回拨确认 · 平滑校时 · 校正后复测偏差 · 远程访问令牌 · 日志多代轮转</footer>
+</div>
+</body>
+</html>
